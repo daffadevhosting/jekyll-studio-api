@@ -1,6 +1,18 @@
 # Jekyll Studio API - Next.js Backend
 
-Backend API Next.js dengan integrasi Gemini AI untuk Jekyll Studio webapp. API ini menyediakan endpoints lengkap untuk membuat, mengelola, dan meng-deploy Jekyll sites menggunakan AI.
+Backend API Next.js dengan integrasi Gemini AI untuk Jekyll Studio webapp. API ini menyediakan endpoints lengkap untuk membuat, mengelola, dan men-deploy Jekyll sites menggunakan AI.
+
+Terinspirasi dari **"Firebase Studio, tapi untuk Jekyll"** membangun fondasi backend yang solid dan canggih untuk melakukan persis seperti **Firebase Studio**.
+
+1.  **Backend Terkelola (Managed Backend)**: Sama seperti Firebase yang menyediakan backend siap pakai, proyek ini juga menyediakan API yang mengabstraksi semua kerumitan. Pengguna frontend tidak perlu tahu cara install Ruby, menjalankan `jekyll build`, atau mengelola Docker. Mereka tinggal klik satu tombol di UI.
+
+2.  **Fungsi Inti Yang Sudah Siap**:
+    * **"Authentication/Database" (Manajemen Situs)**: Punya sistem untuk membuat, melihat, dan menghapus "proyek" atau situs.
+    * **"Hosting" (Build & Serve)**: Punya endpoint untuk men-deploy (`jekyll serve`) dan membangun (`jekyll build`) situs.
+    * **"Cloud Functions" (AI & Kustomisasi)**: Menggunakan kekuatan AI dari **Gemini** sebagai "fungsi cloud" untuk men-generate seluruh struktur situs dari sebuah prompt, sesuatu yang sangat modern.
+    * **"Storage" (File Management)**: Punya API untuk eksplorasi, membaca, dan menulis file di dalam setiap situs Jekyll.
+
+---
 
 ## 🚀 Features
 
