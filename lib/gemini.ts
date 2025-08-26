@@ -37,105 +37,216 @@ interface JekyllSiteStructure {
 class GeminiService {
   private genAI: GoogleGenerativeAI;
   private model: any;
+  private maxRetries = 3;
 
   constructor() {
     if (!process.env.GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY is required');
     }
-    
     this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  }
 
-    // GeminiService initialized with models gemini-2.5-flash and gemini-2.0-flash
+  /**
+   * Extract and clean JSON from AI response
+   */
+  private extractJsonFromResponse(rawText: string): string {
+    // Remove markdown code blocks if present
+    let cleanedText = rawText.trim();
+    if (cleanedText.startsWith('```json')) {
+      cleanedText = cleanedText.substring(7);
+    } else if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.substring(3);
+    }
+    if (cleanedText.endsWith('```')) {
+      cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+    }
+    cleanedText = cleanedText.trim();
+
+    // Find JSON object boundaries
+    const firstBracket = cleanedText.indexOf('{');
+    const lastBracket = cleanedText.lastIndexOf('}');
+    
+    if (firstBracket === -1 || lastBracket === -1) {
+      throw new Error("Respons dari AI tidak mengandung format JSON yang valid.");
+    }
+    
+    return cleanedText.substring(firstBracket, lastBracket + 1);
+  }
+
+  /**
+   * Fix JSON string by properly escaping quotes
+   */
+  private fixJsonString(jsonString: string): string {
+    // Use a state machine to properly handle string escaping
+    let inString = false;
+    let escapeNext = false;
+    let result = '';
+
+    for (let i = 0; i < jsonString.length; i++) {
+      const char = jsonString[i];
+
+      if (escapeNext) {
+        result += char;
+        escapeNext = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        result += char;
+        escapeNext = true;
+        continue;
+      }
+
+      if (char === '"') {
+        if (inString) {
+          // Look ahead to see if this is the end of a string
+          let isEndOfString = true;
+          for (let j = i + 1; j < jsonString.length; j++) {
+            const nextChar = jsonString[j];
+            if (nextChar === ' ' || nextChar === ',' || nextChar === '}' || nextChar === ']' || nextChar === ':') {
+              break;
+            }
+            if (nextChar === '"') {
+              isEndOfString = false;
+              break;
+            }
+          }
+
+          if (isEndOfString) {
+            inString = false;
+            result += char;
+          } else {
+            // This quote should be escaped
+            result += '\\"';
+          }
+        } else {
+          inString = true;
+          result += char;
+        }
+      } else {
+        result += char;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Generate content with retry mechanism for JSON parsing
+   */
+  private async generateAndParse(prompt: string, attempt: number = 1): Promise<any> {
+    if (attempt > this.maxRetries) {
+      throw new Error(`Gagal mendapatkan JSON yang valid dari AI setelah ${this.maxRetries} kali percobaan.`);
+    }
+
+    console.log(chalk.yellow(`[Percobaan ke-${attempt}] Meminta struktur JSON dari AI...`));
+    
+    try {
+      const result = await this.model.generateContent(prompt);
+      const rawText = (await result.response).text();
+
+      try {
+        // Extract and clean JSON
+        const jsonString = this.extractJsonFromResponse(rawText);
+        
+        // Fix JSON string
+        const fixedJsonString = this.fixJsonString(jsonString);
+        
+        // Parse JSON
+        const parsedJson = JSON.parse(fixedJsonString);
+        console.log(chalk.green(`[Percobaan ke-${attempt}] JSON berhasil di-parsing!`));
+        return parsedJson;
+      } catch (parseError: any) {
+        console.error(chalk.red(`[Percobaan ke-${attempt}] Gagal mem-parsing JSON. Error: ${parseError.message}`));
+        console.error(chalk.grey('--- Respons dari AI ---\n'), rawText, '\n--- Akhir Respons ---');
+        
+        // Ask AI to fix its mistake
+        const fixupPrompt = `
+You previously provided the following text which is NOT valid JSON.
+It produced the parsing error: "${parseError.message}".
+
+--- BROKEN TEXT START ---
+${rawText}
+--- BROKEN TEXT END ---
+
+Analyze the broken text and the error message.
+Now, provide ONLY the corrected, 100% valid JSON object. Do not add any extra text or markdown.
+Ensure ALL double quotes inside string values are properly escaped with backslashes.
+        `;
+        
+        // Retry with fix prompt
+        return this.generateAndParse(fixupPrompt, attempt + 1);
+      }
+    } catch (error: any) {
+      console.error(chalk.red(`[Percobaan ke-${attempt}] Error generating content: ${error.message}`));
+      if (attempt >= this.maxRetries) {
+        throw error;
+      }
+      return this.generateAndParse(prompt, attempt + 1);
+    }
   }
 
   /**
    * Generate Jekyll site structure from user prompt
    */
-async generateSiteStructure(prompt: string): Promise<JekyllSiteStructure> {
-    // --- PROMPT BARU YANG LEBIH TEGAS ---
-    const systemPrompt = `
-      You are an expert Jekyll developer who ALWAYS returns valid JSON.
-      Generate a complete Jekyll site structure based on the user's prompt.
+  async generateSiteStructure(prompt: string): Promise<JekyllSiteStructure> {
+    const initialPrompt = `
+You are an expert Jekyll developer who ALWAYS returns valid JSON.
+Generate a complete Jekyll site structure based on the user's prompt.
 
-      **CRITICAL RULE: You MUST return ONLY a single, valid JSON object. Do not include any markdown fences like \`\`\`json or any text outside of the JSON object. The JSON response must be 100% compliant and parsable.**
+CRITICAL RULES:
+1. Return ONLY a single, valid JSON object. No markdown fences or extra text.
+2. Escape ALL double quotes inside string values with backslashes (e.g., "<div class=\\"container\\">").
+3. If user asks for Tailwind CSS, use the placeholder <!-- TAILWIND-CSS --> in layout files.
 
-      **JSON Content Rule: Inside the JSON string values (like the "content" fields), ALL double quotes (") MUST be properly escaped with a backslash (\\"). For example, if you generate HTML like <div class="container">, it MUST be represented in the JSON as "<div class=\\"container\\">". This is the most important rule.**
+JSON structure must follow this exact schema:
+{
+  "name": "site-slug",
+  "title": "Site Title",
+  "description": "Site description",
+  "theme": "theme-name",
+  "config": { ... },
+  "layouts": [{ "name": "...", "content": "..." }],
+  "includes": [{ "name": "...", "content": "..." }],
+  "posts": [{ "title": "...", "date": "...", "content": "..." }],
+  "pages": [{ "name": "...", "title": "...", "content": "..." }],
+  "assets": { "css": "...", "js": "..." }
+}
 
-      The JSON structure MUST follow this schema:
-      {
-        "name": "site-slug",
-        "title": "Site Title",
-        "description": "Site description",
-        "config": { "...": "..." },
-        "layouts": [{ "name": "...", "content": "..." }],
-        "includes": [{ "name": "...", "content": "..." }],
-        "posts": [{ "title": "...", "date": "...", "content": "..." }],
-        "pages": [{ "name": "...", "title": "...", "content": "..." }],
-        "assets": { "css": "...", "js": "..." }
-      }
-
-      User prompt: ${prompt}
+User prompt: ${prompt}
     `;
 
-    let rawText = ''; // Variabel untuk menyimpan teks mentah untuk debugging
-
-    try {
-      const result = await this.model.generateContent(systemPrompt);
-      const response = await result.response;
-      rawText = response.text();
+    const siteStructure = await this.generateAndParse(initialPrompt);
+    
+    // Handle Tailwind CSS if requested
+    if (prompt.toLowerCase().includes('tailwind')) {
+      const tailwindScript = '<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>';
       
-      // --- METODE PEMBERSIHAN YANG LEBIH ROBUST ---
-
-      // 1. Hapus markdown code blocks jika ada
-      let cleanedText = rawText.trim();
-      if (cleanedText.startsWith('```json')) {
-        cleanedText = cleanedText.substring(7);
+      if (siteStructure.layouts) {
+        for (const layout of siteStructure.layouts) {
+          if (layout.content.includes('<!-- TAILWIND-CSS -->')) {
+            layout.content = layout.content.replace('<!-- TAILWIND-CSS -->');
+          } else if (layout.content.includes('<head>')) {
+            layout.content = layout.content.replace('<head>', `<head>${tailwindScript}`);
+          }
+        }
       }
-      if (cleanedText.endsWith('```')) {
-        cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+
+      if (siteStructure.includes) {
+        for (const include of siteStructure.includes) {
+          if (include.content.includes('<!-- TAILWIND-CSS -->')) {
+            include.content = include.content.replace('<!-- TAILWIND-CSS -->', tailwindScript);
+          }
+        }
       }
-      cleanedText = cleanedText.trim();
-
-      // 2. Temukan JSON object yang sebenarnya
-      const firstBracket = cleanedText.indexOf('{');
-      const lastBracket = cleanedText.lastIndexOf('}');
-      
-      if (firstBracket === -1 || lastBracket === -1) {
-        throw new Error("Respons dari AI tidak mengandung format JSON.");
-      }
-      
-      let jsonString = cleanedText.substring(firstBracket, lastBracket + 1);
-
-      // 3. Perbaiki unescaped quotes di dalam string values
-      // Regex untuk menemukan dan memperbaiki quotes yang tidak di-escape
-      jsonString = jsonString.replace(/: "([^"]*)"/g, (match, content) => {
-        // Escape semua double quotes di dalam content
-        const escapedContent = content.replace(/"/g, '\\"');
-        return `: "${escapedContent}"`;
-      });
-
-      // 4. Parse JSON
-      const siteStructure = JSON.parse(jsonString);
-      return this.validateAndCleanStructure(siteStructure);
-
-    } catch (error: any) {
-      // Penanganan error yang informatif
-      console.error(chalk.red('================= AI JSON PARSE ERROR ================='));
-      console.error(chalk.yellow('Gagal mem-parsing JSON dari respons AI.'));
-      console.error(chalk.cyan('Pesan Error:'), error.message);
-      
-      console.error(chalk.grey('--- Raw AI Response Start ---'));
-      console.error(rawText);
-      console.error(chalk.grey('--- Raw AI Response End ---'));
-      console.error(chalk.red('====================================================='));
-
-      throw new Error(`Failed to generate site structure from AI: ${error.message}`);
     }
+
+    return this.validateAndCleanStructure(siteStructure);
   }
 
   /**
-   * Generate individual Jekyll component (layout, include, post, etc.)
+   * Generate individual Jekyll component
    */
   async generateComponent(type: 'layout' | 'include' | 'post' | 'page', prompt: string, context?: any): Promise<string> {
     const systemPrompts = {
