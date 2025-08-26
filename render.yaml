@@ -1,0 +1,38 @@
+services:
+  # 1. Service untuk API Next.js
+  - type: web
+    name: jekyll-studio-api
+    env: docker
+    # Pastikan Dockerfile.api ada di root atau path yang sesuai
+    dockerfilePath: ./Dockerfile.api
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # Set ini di dashboard Render
+      - key: NEXTAUTH_SECRET
+        sync: false # Set ini di dashboard Render
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: cache
+          property: connectionString
+      # Penting: Beri akses ke Docker socket agar bisa build Jekyll
+    disks:
+      - name: projects-disk
+        mountPath: /app/projects
+        sizeGB: 5
+    
+  # 2. Service untuk Jekyll container
+  - type: pservice # Private Service, tidak bisa diakses dari luar
+    name: jekyll-runner
+    env: docker
+    # Kamu perlu Dockerfile untuk jekyll di ./docker/jekyll
+    dockerContext: ./docker/jekyll
+    disks:
+      - name: projects-disk # Gunakan disk yang sama dengan API
+        mountPath: /workspace/projects
+
+  # 3. Service untuk Redis Cache
+  - type: redis
+    name: cache
+    plan: free # atau pilih plan yang lebih besar

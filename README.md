@@ -601,7 +601,7 @@ CC0 1.0 Universal License - see [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
 
-- **Frontend Repository**: [Jekyll Studio Frontend](https://github.com/your-org/jekyll-studio-frontend)
-- **Docker Images**: [Docker Hub](https://hub.docker.com/r/your-org/jekyll-studio)
-- **Documentation**: [Full Documentation](https://docs.jekyll-studio.com)
-- **Issues**: [GitHub Issues](https://github.com/your-org/jekyll-studio-api/issues)
+- **Frontend Repository**: [Jekyll Studio Frontend](https://github.com/daffadevhosting/jekyll-studio-frontend)
+- **Docker Images**: [Docker Hub](https://hub.docker.com/r/daffaaditya/jekyll-studio)
+- **Documentation**: [Full Documentation](https://docs.jekyll-studio.io)
+- **Issues**: [GitHub Issues](https://github.com/daffadevhosting/jekyll-studio-api/issues)
