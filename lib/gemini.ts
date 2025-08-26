@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import chalk from 'chalk';
 
 interface JekyllSiteStructure {
   name: string;
@@ -51,85 +52,84 @@ class GeminiService {
   /**
    * Generate Jekyll site structure from user prompt
    */
-  async generateSiteStructure(prompt: string): Promise<JekyllSiteStructure> {
+async generateSiteStructure(prompt: string): Promise<JekyllSiteStructure> {
+    // --- PROMPT BARU YANG LEBIH TEGAS ---
     const systemPrompt = `
-You are an expert Jekyll developer and web designer. Generate a complete Jekyll site structure based on the user's prompt.
+      You are an expert Jekyll developer who ALWAYS returns valid JSON.
+      Generate a complete Jekyll site structure based on the user's prompt.
 
-Rules:
-1. Return ONLY valid JSON, no explanations or markdown
-2. Create realistic content, not placeholders
-3. Include proper Jekyll front matter
-4. Generate appropriate layouts, includes, and assets
-5. Create at least 2-3 sample posts
-6. Include proper CSS styling
-7. Use semantic HTML structure
+      **CRITICAL RULE: You MUST return ONLY a single, valid JSON object. Do not include any markdown fences like \`\`\`json or any text outside of the JSON object. The JSON response must be 100% compliant and parsable.**
 
-Required JSON structure:
-{
-  "name": "site-slug",
-  "title": "Site Title",
-  "description": "Site description",
-  "theme": "theme-name",
-  "config": {
-    "title": "Site Title",
-    "description": "Site description",
-    "baseurl": "",
-    "url": "",
-    "markdown": "kramdown",
-    "highlighter": "rouge",
-    "sass": {"sass_dir": "_sass"},
-    "plugins": ["jekyll-feed", "jekyll-sitemap"]
-  },
-  "layouts": [
-    {
-      "name": "default.html",
-      "content": "<!-- Complete HTML layout with head, body, etc -->"
-    }
-  ],
-  "includes": [
-    {
-      "name": "head.html", 
-      "content": "<!-- HTML head content -->"
-    }
-  ],
-  "posts": [
-    {
-      "title": "Post Title",
-      "date": "2024-01-01",
-      "content": "---\\nlayout: post\\ntitle: Title\\ndate: 2024-01-01\\n---\\n\\nPost content here",
-      "tags": ["tag1", "tag2"],
-      "categories": ["category1"]
-    }
-  ],
-  "pages": [
-    {
-      "name": "index.html",
-      "title": "Home",
-      "content": "---\\nlayout: default\\n---\\n\\nHome page content",
-      "permalink": "/"
-    }
-  ],
-  "assets": {
-    "css": "/* CSS styles */",
-    "js": "/* JavaScript code */"
-  }
-}
+      **JSON Content Rule: Inside the JSON string values (like the "content" fields), ALL double quotes (") MUST be properly escaped with a backslash (\\"). For example, if you generate HTML like <div class="container">, it MUST be represented in the JSON as "<div class=\\"container\\">". This is the most important rule.**
 
-User prompt: ${prompt}
-`;
+      The JSON structure MUST follow this schema:
+      {
+        "name": "site-slug",
+        "title": "Site Title",
+        "description": "Site description",
+        "config": { "...": "..." },
+        "layouts": [{ "name": "...", "content": "..." }],
+        "includes": [{ "name": "...", "content": "..." }],
+        "posts": [{ "title": "...", "date": "...", "content": "..." }],
+        "pages": [{ "name": "...", "title": "...", "content": "..." }],
+        "assets": { "css": "...", "js": "..." }
+      }
+
+      User prompt: ${prompt}
+    `;
+
+    let rawText = ''; // Variabel untuk menyimpan teks mentah untuk debugging
 
     try {
       const result = await this.model.generateContent(systemPrompt);
       const response = await result.response;
-      let text = response.text();
+      rawText = response.text();
       
-      // Clean up response to ensure valid JSON
-      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      // --- METODE PEMBERSIHAN YANG LEBIH ROBUST ---
+
+      // 1. Hapus markdown code blocks jika ada
+      let cleanedText = rawText.trim();
+      if (cleanedText.startsWith('```json')) {
+        cleanedText = cleanedText.substring(7);
+      }
+      if (cleanedText.endsWith('```')) {
+        cleanedText = cleanedText.substring(0, cleanedText.length - 3);
+      }
+      cleanedText = cleanedText.trim();
+
+      // 2. Temukan JSON object yang sebenarnya
+      const firstBracket = cleanedText.indexOf('{');
+      const lastBracket = cleanedText.lastIndexOf('}');
       
-      const siteStructure = JSON.parse(text);
+      if (firstBracket === -1 || lastBracket === -1) {
+        throw new Error("Respons dari AI tidak mengandung format JSON.");
+      }
+      
+      let jsonString = cleanedText.substring(firstBracket, lastBracket + 1);
+
+      // 3. Perbaiki unescaped quotes di dalam string values
+      // Regex untuk menemukan dan memperbaiki quotes yang tidak di-escape
+      jsonString = jsonString.replace(/: "([^"]*)"/g, (match, content) => {
+        // Escape semua double quotes di dalam content
+        const escapedContent = content.replace(/"/g, '\\"');
+        return `: "${escapedContent}"`;
+      });
+
+      // 4. Parse JSON
+      const siteStructure = JSON.parse(jsonString);
       return this.validateAndCleanStructure(siteStructure);
-    } catch (error) {
-      console.error('Error generating site structure:', error);
+
+    } catch (error: any) {
+      // Penanganan error yang informatif
+      console.error(chalk.red('================= AI JSON PARSE ERROR ================='));
+      console.error(chalk.yellow('Gagal mem-parsing JSON dari respons AI.'));
+      console.error(chalk.cyan('Pesan Error:'), error.message);
+      
+      console.error(chalk.grey('--- Raw AI Response Start ---'));
+      console.error(rawText);
+      console.error(chalk.grey('--- Raw AI Response End ---'));
+      console.error(chalk.red('====================================================='));
+
       throw new Error(`Failed to generate site structure from AI: ${error.message}`);
     }
   }
