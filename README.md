@@ -22,7 +22,7 @@ Backend API Next.js dengan integrasi Gemini AI untuk Jekyll Studio webapp. API i
 
 ### 1. Clone dan Setup
 ```bash
-git clone <repository>
+git clone https://github.com/daffadevhosting/jekyll-studio-api.git
 cd jekyll-studio-api
 ```
 
@@ -569,7 +569,7 @@ DEBUG=jekyll-studio:* npm run dev
 ### Development Setup
 ```bash
 # Clone repository
-git clone <repository>
+git clone https://github.com/daffadevhosting/jekyll-studio-api.git
 cd jekyll-studio-api
 
 # Install dependencies
@@ -597,7 +597,7 @@ npm test
 
 ## 📝 License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+CC0 1.0 Universal License - see [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
 
