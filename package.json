@@ -1,0 +1,54 @@
+{
+  "name": "jekyll-studio-api",
+  "version": "1.0.0",
+  "description": "Next.js API for Jekyll Studio with Gemini AI integration",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "docker:build": "docker-compose -f docker-compose.yml build",
+    "docker:up": "docker-compose -f docker-compose.yml up -d",
+    "docker:down": "docker-compose -f docker-compose.yml down"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.2.1",
+    "archiver": "^6.0.1",
+    "chokidar": "^3.5.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "fs-extra": "^11.2.0",
+    "helmet": "^7.1.0",
+    "multer": "^1.4.5-lts.1",
+    "next": "^14.0.0",
+    "rate-limiter-flexible": "^7.2.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "redis": "^5.8.2",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/fs-extra": "^11.0.4",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@types/ws": "^8.5.10",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "jekyll",
+    "ai",
+    "gemini",
+    "nextjs",
+    "cms"
+  ],
+  "author": "Jekyll Studio",
+  "license": "MIT"
+}

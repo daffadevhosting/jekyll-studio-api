@@ -1,0 +1,143 @@
+version: '3.8'
+
+services:
+  # Next.js API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: jekyll-studio-api
+    ports:
+      - "3000:3000"
+      - "8080:8080"  # WebSocket port
+    environment:
+      - NODE_ENV=development
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=http://localhost:3000
+    volumes:
+      - ./projects:/app/projects
+      - ./templates:/app/templates
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for container management
+    depends_on:
+      - jekyll
+      - redis
+    networks:
+      - jekyll-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Jekyll Container
+  jekyll:
+    build:
+      context: ./docker/jekyll
+      dockerfile: Dockerfile
+    container_name: jekyll-studio-container
+    ports:
+      - "4000-4010:4000-4010"  # Range for multiple sites
+      - "35729:35729"          # LiveReload
+    volumes:
+      - ./projects:/workspace/projects
+      - ./templates:/workspace/templates
+      - jekyll_bundle_cache:/workspace/.bundle
+    environment:
+      - JEKYLL_ENV=development
+      - BUNDLE_PATH=/workspace/.bundle
+    networks:
+      - jekyll-network
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: jekyll-studio-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - jekyll-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: jekyll-studio-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./projects:/var/www/html:ro
+    depends_on:
+      - api
+      - jekyll
+    networks:
+      - jekyll-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Optional: PostgreSQL for data persistence
+  postgres:
+    image: postgres:15-alpine
+    container_name: jekyll-studio-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=jekyll_studio
+      - POSTGRES_USER=jekyll_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jekyll_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - jekyll-network
+    restart: unless-stopped
+    profiles:
+      - persistence
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jekyll_user -d jekyll_studio"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # File Manager (optional) - for browsing generated sites
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: jekyll-studio-files
+    ports:
+      - "8081:80"
+    volumes:
+      - ./projects:/srv/projects
+      - ./filebrowser.json:/.filebrowser.json
+    networks:
+      - jekyll-network
+    restart: unless-stopped
+    profiles:
+      - tools
+
+volumes:
+  jekyll_bundle_cache:
+  redis_data:
+  postgres_data:
+
+networks:
+  jekyll-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
