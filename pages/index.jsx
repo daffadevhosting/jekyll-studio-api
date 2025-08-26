@@ -60,6 +60,9 @@ const HomePage = () => {
   return (
     <div style={containerStyle}>
       <div style={statusBoxStyle}>
+      <span className="material-symbols-outlined" style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
+        Jekyll Studio
+      </span>
         <h1 style={headingStyle}>API Status</h1>
         <p style={messageStyle}>{statusMessage}</p>
       </div>
