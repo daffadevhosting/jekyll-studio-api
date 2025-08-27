@@ -34,7 +34,7 @@ class JekyllManager extends EventEmitter {
   constructor() {
     super();
     this.projectsDir = path.join(process.cwd(), 'projects');
-    this.dockerComposePath = path.join(process.cwd(), 'docker-compose.yml');
+    this.dockerComposePath = path.join(process.cwd(), 'docker compose.yml');
     this.ensureProjectsDir();
   }
 
@@ -98,7 +98,7 @@ class JekyllManager extends EventEmitter {
 
     try {
       // Build using Docker container
-      const command = `docker-compose run --rm jekyll build /workspace/projects/${site.name}`;
+      const command = `docker compose run --rm jekyll build /workspace/projects/${site.name}`;
       const { stdout, stderr } = await execAsync(command, {
         cwd: path.dirname(this.dockerComposePath),
         timeout: 120000 // 2 minutes timeout
@@ -144,7 +144,7 @@ class JekyllManager extends EventEmitter {
 
     try {
       // Start development server using Docker
-      const command = `docker-compose run --rm -d -p ${servePort}:${servePort} jekyll serve /workspace/projects/${site.name} ${servePort}`;
+      const command = `docker compose run --rm -d -p ${servePort}:${servePort} jekyll serve /workspace/projects/${site.name} ${servePort}`;
       await execAsync(command, {
         cwd: path.dirname(this.dockerComposePath)
       });
@@ -178,7 +178,7 @@ class JekyllManager extends EventEmitter {
 
     try {
       // Stop Docker container (simplified - you might need container ID tracking)
-      await execAsync('docker-compose down', {
+      await execAsync('docker compose down', {
         cwd: path.dirname(this.dockerComposePath)
       });
 

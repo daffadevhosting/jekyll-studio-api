@@ -94,11 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         postsCount: structure.posts.length,
         pagesCount: structure.pages.length
       },
-      buildResult: {
-        success: buildResult.success,
-        buildTime: buildResult.buildTime,
-        hasError: !!buildResult.error
-      },
+      buildResult,
       previewUrl: null // Will be set when site is served
     });
 
