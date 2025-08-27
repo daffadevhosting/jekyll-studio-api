@@ -29,22 +29,24 @@ class WebSocketManager {
     this.setupJekyllManagerListeners();
   }
 
-  initialize(server: any): void {
-    if (this.wss) {
-      console.log('WebSocket server already running');
-      return;
-    }
-
-    this.wss = new WebSocketServer({ 
-      port: parseInt(process.env.WS_PORT || '8080'),
-      verifyClient: this.verifyClient.bind(this)
-    });
-
-    this.wss.on('connection', this.handleConnection.bind(this));
-    this.startHeartbeat();
-    
-    console.log(`WebSocket server started on port ${process.env.WS_PORT || 8080}`);
+// Replace the initialize method
+initialize(server: any): void {
+  if (this.wss) {
+    console.log('WebSocket server already running');
+    return;
   }
+
+  // Use the provided HTTP server instead of creating a separate one
+  this.wss = new WebSocketServer({ 
+    server: server,
+    verifyClient: this.verifyClient.bind(this)
+  });
+
+  this.wss.on('connection', this.handleConnection.bind(this));
+  this.startHeartbeat();
+  
+  console.log(`WebSocket server attached to HTTP server`);
+}
 
   private verifyClient(info: { origin: string; secure: boolean; req: IncomingMessage }): boolean {
     // Simple origin check for development
@@ -321,6 +323,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       websocket: {
         status: 'running',
         port: process.env.WS_PORT || 8080,
+        clients: stats.totalClients,
+        subscriptions: stats.clientsBySubscriptions,
         ...stats
       }
     });
@@ -368,15 +372,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-// Auto-initialize WebSocket server in production
-if (process.env.NODE_ENV === 'production') {
-  if (!wsManager) {
-    wsManager = new WebSocketManager();
-    // Initialize with a delay to ensure server is ready
-    setTimeout(() => {
-      wsManager?.initialize(null);
-    }, 1000);
-  }
+// Auto-initialize WebSocket server
+if (!wsManager) {
+  wsManager = new WebSocketManager();
+  // Initialize with a delay to ensure server is ready
+  setTimeout(() => {
+    wsManager?.initialize(null);
+  }, 1000);
 }
 
 // Cleanup on process exit

@@ -31,7 +31,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const limitNum = Math.min(parseInt(limit as string) || 50, 100);
       const offsetNum = parseInt(offset as string) || 0;
       const paginatedSites = sites.slice(offsetNum, offsetNum + limitNum);
-      
       // Add statistics for each site
       const sitesWithStats = await Promise.all(
         paginatedSites.map(async (site) => {
@@ -49,6 +48,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         })
       );
+      
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('X-Total-Count', sites.length);
       
       res.json({
         success: true,
