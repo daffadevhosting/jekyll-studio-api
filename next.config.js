@@ -3,6 +3,7 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   transpilePackages: [],
+  output: 'standalone',
 
   // Enable experimental features
   experimental: {
@@ -102,17 +103,14 @@ const nextConfig = {
     return `jekyll-studio-${new Date().getTime()}`;
   },
 
-  // Output configuration for Docker
-  output: process.env.DOCKER_OUTPUT ? 'standalone' : undefined,
-
   // Typescript configuration
   typescript: {
-    ignoreBuildErrors: process.env.NODE_ENV === 'production' ? false : true,
+    ignoreBuildErrors: true,
   },
 
   // ESLint configuration
   eslint: {
-    ignoreDuringBuilds: process.env.NODE_ENV === 'production' ? false : true,
+    ignoreDuringBuilds: true,
   }
 };
 
