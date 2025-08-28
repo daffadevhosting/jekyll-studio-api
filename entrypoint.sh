@@ -44,4 +44,4 @@ fi
 
 # Start the application
 echo "Starting Next.js server..."
-exec npm start
+exec node server.js
