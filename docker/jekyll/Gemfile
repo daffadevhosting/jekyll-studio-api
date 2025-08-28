@@ -1,0 +1,10 @@
+source "https://rubygems.org"
+
+# Tambahkan gem Jekyll
+gem "jekyll", "~> 4.3"
+
+# Plugin Jekyll standar yang sering digunakan
+group :jekyll_plugins do
+  gem "jekyll-feed", "~> 0.12"
+  gem "jekyll-sitemap", "~> 1.4"
+end
