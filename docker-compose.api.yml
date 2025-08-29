@@ -35,7 +35,7 @@ services:
   jekyll:
     build:
       context: ./docker/jekyll
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.api
     container_name: jekyll-studio-container
     ports:
       - "4000-4010:4000-4010"  # Range for multiple sites
