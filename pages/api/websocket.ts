@@ -375,10 +375,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 // Auto-initialize WebSocket server
 if (!wsManager) {
   wsManager = new WebSocketManager();
-  // Initialize with a delay to ensure server is ready
-  setTimeout(() => {
-    wsManager?.initialize(null);
-  }, 1000);
+  // Standalone server langsung di port 8080
+  wsManager.initializeStandalone();
+}
+
+// Tambahin method baru di class WebSocketManager
+initializeStandalone(): void {
+  if (this.wss) {
+    console.log('WebSocket server already running');
+    return;
+  }
+
+  this.wss = new WebSocketServer({ port: 8080 });
+  this.wss.on('connection', this.handleConnection.bind(this));
+  this.startHeartbeat();
+
+  console.log('WebSocket server listening on ws://localhost:8080');
 }
 
 // Cleanup on process exit
